@@ -11,10 +11,18 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
-	"github.com/joho/godotenv"
+	"github.com/spf13/viper"
 	httpSwagger "github.com/swaggo/http-swagger"
 )
+
+// Config holds application configuration
+type Config struct {
+	Port   string `mapstructure:"PORT"`
+	DBConn string `mapstructure:"DB_CONN"`
+	AppEnv string `mapstructure:"APP_ENV"`
+}
 
 // @title Category Management API
 // @version 1.0
@@ -105,27 +113,41 @@ func corsMiddlewareWrapper(handler http.Handler) http.Handler {
 }
 
 func main() {
-	// Load .env file
-	err := godotenv.Load()
-	if err != nil {
-		log.Println("Warning: .env file not found, using environment variables")
+	// Load configuration with Viper
+	viper.AutomaticEnv()
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
+	if _, err := os.Stat(".env"); err == nil {
+		viper.SetConfigFile(".env")
+		_ = viper.ReadInConfig()
+	}
+
+	config := Config{
+		Port:   viper.GetString("PORT"),
+		DBConn: viper.GetString("DB_CONN"),
+		AppEnv: viper.GetString("APP_ENV"),
+	}
+
+	// Set default port
+	if config.Port == "" {
+		config.Port = "8080"
 	}
 
 	// Configure Swagger for production (HTTPS) or local (HTTP)
-	if os.Getenv("APP_ENV") == "production" {
+	if config.AppEnv == "production" {
 		docs.SwaggerInfo.Host = "category-management-apis.zeabur.app"
 		docs.SwaggerInfo.Schemes = []string{"https"}
 	} else {
-		docs.SwaggerInfo.Host = "localhost:8080"
+		docs.SwaggerInfo.Host = "localhost:" + config.Port
 		docs.SwaggerInfo.Schemes = []string{"http"}
 	}
 
 	// ============================================
 	// DATABASE CONNECTION
 	// ============================================
-	db, err := database.ConnectPostgres()
+	db, err := database.InitDB(config.DBConn)
 	if err != nil {
-		log.Fatal("Failed to connect to database:", err)
+		log.Fatal("Failed to initialize database:", err)
 	}
 	defer database.CloseDB()
 
@@ -171,15 +193,10 @@ func main() {
 	// API Documentation endpoint
 	mux.HandleFunc("/docs/", httpSwagger.WrapHandler)
 
-	// Get port from environment
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-
 	// Start server with CORS middleware wrapping all routes
-	fmt.Printf("Server running on port %s\n", port)
-	fmt.Printf("API Documentation: http://localhost:%s/docs/index.html\n", port)
+	addr := "0.0.0.0:" + config.Port
+	fmt.Printf("Server running on %s\n", addr)
+	fmt.Printf("API Documentation: http://localhost:%s/docs/index.html\n", config.Port)
 	log.Println("Available endpoints:")
 	log.Println("  GET    /health")
 	log.Println("  GET    /categories")
@@ -196,7 +213,7 @@ func main() {
 	// Wrap the entire mux with CORS middleware
 	handler := corsMiddlewareWrapper(mux)
 
-	err = http.ListenAndServe(":"+port, handler)
+	err = http.ListenAndServe(addr, handler)
 	if err != nil {
 		log.Fatal("Failed to start server:", err)
 	}
