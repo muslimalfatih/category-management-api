@@ -52,7 +52,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/models.Response"
+                                    "$ref": "#/definitions/helpers.Response"
                                 },
                                 {
                                     "type": "object",
@@ -68,13 +68,45 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid request body or validation error",
                         "schema": {
-                            "$ref": "#/definitions/models.Response"
+                            "$ref": "#/definitions/helpers.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Server error or insufficient stock",
                         "schema": {
-                            "$ref": "#/definitions/models.Response"
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/dashboard": {
+            "get": {
+                "description": "Retrieve summary statistics for the POS dashboard",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Dashboard"
+                ],
+                "summary": "Get dashboard statistics",
+                "responses": {
+                    "200": {
+                        "description": "Successfully retrieved dashboard data",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/helpers.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/models.DashboardStats"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -82,7 +114,7 @@ const docTemplate = `{
         },
         "/api/report": {
             "get": {
-                "description": "Get sales summary for a specific date range including total revenue, transaction count, and best selling product",
+                "description": "Retrieve the sales summary for a specific date range",
                 "produces": [
                     "application/json"
                 ],
@@ -93,16 +125,14 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "example": "\"2026-01-01\"",
-                        "description": "Start date (YYYY-MM-DD format)",
+                        "description": "Start date (YYYY-MM-DD)",
                         "name": "start_date",
                         "in": "query",
                         "required": true
                     },
                     {
                         "type": "string",
-                        "example": "\"2026-02-01\"",
-                        "description": "End date (YYYY-MM-DD format)",
+                        "description": "End date (YYYY-MM-DD)",
                         "name": "end_date",
                         "in": "query",
                         "required": true
@@ -110,11 +140,11 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "Sales report retrieved successfully",
+                        "description": "Successfully retrieved report",
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/models.Response"
+                                    "$ref": "#/definitions/helpers.Response"
                                 },
                                 {
                                     "type": "object",
@@ -128,15 +158,9 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Missing required query parameters",
+                        "description": "Missing start_date or end_date",
                         "schema": {
-                            "$ref": "#/definitions/models.Response"
-                        }
-                    },
-                    "500": {
-                        "description": "Failed to get report",
-                        "schema": {
-                            "$ref": "#/definitions/models.Response"
+                            "$ref": "#/definitions/helpers.ErrorResponse"
                         }
                     }
                 }
@@ -144,7 +168,7 @@ const docTemplate = `{
         },
         "/api/report/today": {
             "get": {
-                "description": "Get sales summary for today including total revenue, transaction count, and best selling product",
+                "description": "Retrieve the sales summary for today including revenue, transaction count, and best seller",
                 "produces": [
                     "application/json"
                 ],
@@ -154,11 +178,11 @@ const docTemplate = `{
                 "summary": "Get today's sales report",
                 "responses": {
                     "200": {
-                        "description": "Daily sales report retrieved successfully",
+                        "description": "Successfully retrieved today's report",
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/models.Response"
+                                    "$ref": "#/definitions/helpers.Response"
                                 },
                                 {
                                     "type": "object",
@@ -170,11 +194,104 @@ const docTemplate = `{
                                 }
                             ]
                         }
+                    }
+                }
+            }
+        },
+        "/api/transactions": {
+            "get": {
+                "description": "Retrieve a paginated list of all transactions",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Transactions"
+                ],
+                "summary": "Get all transactions",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page number (default: 1)",
+                        "name": "page",
+                        "in": "query"
                     },
-                    "500": {
-                        "description": "Failed to get daily report",
+                    {
+                        "type": "integer",
+                        "description": "Items per page (default: 20, max: 100)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Successfully retrieved transactions",
                         "schema": {
-                            "$ref": "#/definitions/models.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/helpers.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/models.PaginatedTransactions"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/transactions/{id}": {
+            "get": {
+                "description": "Retrieve details of a specific transaction including its items",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Transactions"
+                ],
+                "summary": "Get a transaction by ID",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Transaction ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Transaction retrieved successfully",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/helpers.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/models.Transaction"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid transaction ID",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Transaction not found",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
                         }
                     }
                 }
@@ -196,7 +313,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/models.Response"
+                                    "$ref": "#/definitions/helpers.Response"
                                 },
                                 {
                                     "type": "object",
@@ -243,7 +360,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/models.Response"
+                                    "$ref": "#/definitions/helpers.Response"
                                 },
                                 {
                                     "type": "object",
@@ -259,7 +376,7 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid request body or validation error",
                         "schema": {
-                            "$ref": "#/definitions/models.Response"
+                            "$ref": "#/definitions/helpers.ErrorResponse"
                         }
                     }
                 }
@@ -290,7 +407,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/models.Response"
+                                    "$ref": "#/definitions/helpers.Response"
                                 },
                                 {
                                     "type": "object",
@@ -306,13 +423,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid category ID",
                         "schema": {
-                            "$ref": "#/definitions/models.Response"
+                            "$ref": "#/definitions/helpers.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Category not found",
                         "schema": {
-                            "$ref": "#/definitions/models.Response"
+                            "$ref": "#/definitions/helpers.ErrorResponse"
                         }
                     }
                 }
@@ -353,7 +470,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/models.Response"
+                                    "$ref": "#/definitions/helpers.Response"
                                 },
                                 {
                                     "type": "object",
@@ -369,13 +486,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid request body or validation error",
                         "schema": {
-                            "$ref": "#/definitions/models.Response"
+                            "$ref": "#/definitions/helpers.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Category not found",
                         "schema": {
-                            "$ref": "#/definitions/models.Response"
+                            "$ref": "#/definitions/helpers.ErrorResponse"
                         }
                     }
                 }
@@ -402,42 +519,69 @@ const docTemplate = `{
                     "200": {
                         "description": "Category deleted successfully",
                         "schema": {
-                            "$ref": "#/definitions/models.Response"
+                            "$ref": "#/definitions/helpers.Response"
                         }
                     },
                     "400": {
                         "description": "Invalid category ID",
                         "schema": {
-                            "$ref": "#/definitions/models.Response"
+                            "$ref": "#/definitions/helpers.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Category not found",
                         "schema": {
-                            "$ref": "#/definitions/models.Response"
+                            "$ref": "#/definitions/helpers.ErrorResponse"
                         }
                     }
                 }
             }
         },
-        "/health": {
+        "/categories/{id}/products": {
             "get": {
-                "description": "Check if the API server is running",
+                "description": "Retrieve all products belonging to a specific category",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "Health"
+                    "Categories"
                 ],
-                "summary": "Health check endpoint",
+                "summary": "Get products by category",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Category ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
                 "responses": {
                     "200": {
-                        "description": "Server is running",
+                        "description": "Products retrieved successfully",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/helpers.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/models.Product"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid category ID",
+                        "schema": {
+                            "$ref": "#/definitions/helpers.ErrorResponse"
                         }
                     }
                 }
@@ -467,7 +611,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/models.Response"
+                                    "$ref": "#/definitions/helpers.Response"
                                 },
                                 {
                                     "type": "object",
@@ -514,7 +658,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/models.Response"
+                                    "$ref": "#/definitions/helpers.Response"
                                 },
                                 {
                                     "type": "object",
@@ -530,7 +674,7 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid request body or validation error",
                         "schema": {
-                            "$ref": "#/definitions/models.Response"
+                            "$ref": "#/definitions/helpers.ErrorResponse"
                         }
                     }
                 }
@@ -561,7 +705,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/models.Response"
+                                    "$ref": "#/definitions/helpers.Response"
                                 },
                                 {
                                     "type": "object",
@@ -577,13 +721,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid product ID",
                         "schema": {
-                            "$ref": "#/definitions/models.Response"
+                            "$ref": "#/definitions/helpers.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Product not found",
                         "schema": {
-                            "$ref": "#/definitions/models.Response"
+                            "$ref": "#/definitions/helpers.ErrorResponse"
                         }
                     }
                 }
@@ -624,7 +768,7 @@ const docTemplate = `{
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/models.Response"
+                                    "$ref": "#/definitions/helpers.Response"
                                 },
                                 {
                                     "type": "object",
@@ -640,13 +784,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Invalid request body or validation error",
                         "schema": {
-                            "$ref": "#/definitions/models.Response"
+                            "$ref": "#/definitions/helpers.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Product not found",
                         "schema": {
-                            "$ref": "#/definitions/models.Response"
+                            "$ref": "#/definitions/helpers.ErrorResponse"
                         }
                     }
                 }
@@ -673,19 +817,19 @@ const docTemplate = `{
                     "200": {
                         "description": "Product deleted successfully",
                         "schema": {
-                            "$ref": "#/definitions/models.Response"
+                            "$ref": "#/definitions/helpers.Response"
                         }
                     },
                     "400": {
                         "description": "Invalid product ID",
                         "schema": {
-                            "$ref": "#/definitions/models.Response"
+                            "$ref": "#/definitions/helpers.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Product not found",
                         "schema": {
-                            "$ref": "#/definitions/models.Response"
+                            "$ref": "#/definitions/helpers.ErrorResponse"
                         }
                     }
                 }
@@ -693,6 +837,39 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "helpers.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string",
+                    "example": "validation detail"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Error occurred"
+                },
+                "status": {
+                    "type": "boolean",
+                    "example": false
+                }
+            }
+        },
+        "helpers.Response": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "object"
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Success"
+                },
+                "status": {
+                    "type": "boolean",
+                    "example": true
+                }
+            }
+        },
         "models.BestSellingProduct": {
             "description": "Best selling product information",
             "type": "object",
@@ -779,6 +956,63 @@ const docTemplate = `{
                 }
             }
         },
+        "models.DashboardStats": {
+            "description": "Dashboard summary statistics",
+            "type": "object",
+            "properties": {
+                "best_selling_today": {
+                    "$ref": "#/definitions/models.BestSellingProduct"
+                },
+                "low_stock_count": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "total_categories": {
+                    "type": "integer",
+                    "example": 8
+                },
+                "total_products": {
+                    "type": "integer",
+                    "example": 50
+                },
+                "total_revenue_today": {
+                    "type": "integer",
+                    "example": 450000
+                },
+                "transactions_today": {
+                    "type": "integer",
+                    "example": 10
+                }
+            }
+        },
+        "models.PaginatedTransactions": {
+            "description": "Paginated list of transactions",
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.TransactionListItem"
+                    }
+                },
+                "limit": {
+                    "type": "integer",
+                    "example": 10
+                },
+                "page": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "total": {
+                    "type": "integer",
+                    "example": 100
+                },
+                "total_pages": {
+                    "type": "integer",
+                    "example": 10
+                }
+            }
+        },
         "models.Product": {
             "description": "Product information with ID, name, price, stock, and category relationship",
             "type": "object",
@@ -846,23 +1080,6 @@ const docTemplate = `{
                 "stock": {
                     "type": "integer",
                     "example": 50
-                }
-            }
-        },
-        "models.Response": {
-            "description": "Standard API response structure",
-            "type": "object",
-            "properties": {
-                "data": {
-                    "type": "object"
-                },
-                "message": {
-                    "type": "string",
-                    "example": "Success"
-                },
-                "status": {
-                    "type": "boolean",
-                    "example": true
                 }
             }
         },
@@ -936,6 +1153,28 @@ const docTemplate = `{
                     "example": 1
                 }
             }
+        },
+        "models.TransactionListItem": {
+            "description": "Transaction summary for list display",
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string",
+                    "example": "2026-02-08T12:00:00Z"
+                },
+                "id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "item_count": {
+                    "type": "integer",
+                    "example": 3
+                },
+                "total_amount": {
+                    "type": "integer",
+                    "example": 45000
+                }
+            }
         }
     }
 }`
@@ -946,8 +1185,8 @@ var SwaggerInfo = &swag.Spec{
 	Host:             "",
 	BasePath:         "/",
 	Schemes:          []string{"http", "https"},
-	Title:            "Category Management API",
-	Description:      "RESTful API for managing categories and products with full CRUD operations\n\n## Features:\n- Category Management (Get all, Get by ID, Create, Update, Delete)\n- Product Management (Get all with category names, Get by ID with category, Create, Update, Delete)\n- Product Search by Name (case-insensitive partial match)\n- Product-Category Relationship (Foreign key with JOIN operations)\n- Transaction / Checkout (Process multi-item checkout with stock deduction)\n- Sales Reports (Daily summary and date range reports with best selling product)\n\n## Response Format:\nAll endpoints return a standard response with:\n- status (bool): Request success status\n- message (string): Response message\n- data (object): Response data (when applicable)",
+	Title:            "Retail Core API",
+	Description:      "RESTful API for managing categories, products, transactions, and POS operations\n\n## Features:\n- Category Management (CRUD)\n- Product Management (CRUD with category relationship)\n- Product Search by Name (case-insensitive partial match)\n- Transaction / Checkout (multi-item checkout with stock deduction)\n- Sales Reports (daily summary, date range, best selling product)\n- Dashboard Statistics",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

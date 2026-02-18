@@ -49,3 +49,33 @@ type BestSellingProduct struct {
 	Name    string `json:"name" example:"Indomie Goreng"`
 	QtySold int    `json:"qty_sold" example:"12"`
 }
+
+// DashboardStats represents the summary statistics for the dashboard
+// @Description Dashboard summary statistics
+type DashboardStats struct {
+	TotalRevenueToday int                 `json:"total_revenue_today" example:"450000"`
+	TransactionsToday int                 `json:"transactions_today" example:"10"`
+	TotalProducts     int                 `json:"total_products" example:"50"`
+	TotalCategories   int                 `json:"total_categories" example:"8"`
+	LowStockCount     int                 `json:"low_stock_count" example:"3"`
+	BestSellingToday  *BestSellingProduct `json:"best_selling_today"`
+}
+
+// TransactionListItem represents a transaction in the list view
+// @Description Transaction summary for list display
+type TransactionListItem struct {
+	ID          int       `json:"id" example:"1"`
+	TotalAmount int       `json:"total_amount" example:"45000"`
+	ItemCount   int       `json:"item_count" example:"3"`
+	CreatedAt   time.Time `json:"created_at" example:"2026-02-08T12:00:00Z"`
+}
+
+// PaginatedTransactions represents a paginated list of transactions
+// @Description Paginated list of transactions
+type PaginatedTransactions struct {
+	Data       []TransactionListItem `json:"data"`
+	Total      int                   `json:"total" example:"100"`
+	Page       int                   `json:"page" example:"1"`
+	Limit      int                   `json:"limit" example:"10"`
+	TotalPages int                   `json:"total_pages" example:"10"`
+}

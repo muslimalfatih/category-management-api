@@ -1,8 +1,8 @@
 package repositories
 
 import (
-	"category-management-api/models"
 	"database/sql"
+	"retail-core-api/models"
 	"time"
 )
 
@@ -10,6 +10,7 @@ import (
 type ProductRepository interface {
 	GetAll(name string) ([]models.Product, error)
 	GetByID(id int) (*models.Product, error)
+	GetByCategoryID(categoryID int) ([]models.Product, error)
 	Create(product models.Product) (*models.Product, error)
 	Update(id int, product models.Product) (*models.Product, error)
 	Delete(id int) error
@@ -215,4 +216,53 @@ func (r *productRepository) Delete(id int) error {
 	}
 
 	return nil
+}
+
+// GetByCategoryID returns all products belonging to a specific category
+func (r *productRepository) GetByCategoryID(categoryID int) ([]models.Product, error) {
+	query := `
+		SELECT
+			p.id,
+			p.name,
+			p.price,
+			p.stock,
+			p.category_id,
+			COALESCE(c.name, '') as category_name,
+			p.created_at,
+			p.updated_at
+		FROM products p
+		LEFT JOIN categories c ON p.category_id = c.id
+		WHERE p.category_id = $1
+		ORDER BY p.id
+	`
+	rows, err := r.db.Query(query, categoryID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var products []models.Product
+	for rows.Next() {
+		var prod models.Product
+		err := rows.Scan(
+			&prod.ID,
+			&prod.Name,
+			&prod.Price,
+			&prod.Stock,
+			&prod.CategoryID,
+			&prod.CategoryName,
+			&prod.CreatedAt,
+			&prod.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		products = append(products, prod)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return products, nil
 }

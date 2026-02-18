@@ -1,5 +1,28 @@
 basePath: /
 definitions:
+  helpers.ErrorResponse:
+    properties:
+      error:
+        example: validation detail
+        type: string
+      message:
+        example: Error occurred
+        type: string
+      status:
+        example: false
+        type: boolean
+    type: object
+  helpers.Response:
+    properties:
+      data:
+        type: object
+      message:
+        example: Success
+        type: string
+      status:
+        example: true
+        type: boolean
+    type: object
   models.BestSellingProduct:
     description: Best selling product information
     properties:
@@ -61,6 +84,47 @@ definitions:
           $ref: '#/definitions/models.CheckoutItem'
         type: array
     type: object
+  models.DashboardStats:
+    description: Dashboard summary statistics
+    properties:
+      best_selling_today:
+        $ref: '#/definitions/models.BestSellingProduct'
+      low_stock_count:
+        example: 3
+        type: integer
+      total_categories:
+        example: 8
+        type: integer
+      total_products:
+        example: 50
+        type: integer
+      total_revenue_today:
+        example: 450000
+        type: integer
+      transactions_today:
+        example: 10
+        type: integer
+    type: object
+  models.PaginatedTransactions:
+    description: Paginated list of transactions
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/models.TransactionListItem'
+        type: array
+      limit:
+        example: 10
+        type: integer
+      page:
+        example: 1
+        type: integer
+      total:
+        example: 100
+        type: integer
+      total_pages:
+        example: 10
+        type: integer
+    type: object
   models.Product:
     description: Product information with ID, name, price, stock, and category relationship
     properties:
@@ -113,18 +177,6 @@ definitions:
     - price
     - stock
     type: object
-  models.Response:
-    description: Standard API response structure
-    properties:
-      data:
-        type: object
-      message:
-        example: Success
-        type: string
-      status:
-        example: true
-        type: boolean
-    type: object
   models.SalesReport:
     description: Sales summary report with revenue, transaction count, and best seller
     properties:
@@ -176,30 +228,40 @@ definitions:
         example: 1
         type: integer
     type: object
+  models.TransactionListItem:
+    description: Transaction summary for list display
+    properties:
+      created_at:
+        example: "2026-02-08T12:00:00Z"
+        type: string
+      id:
+        example: 1
+        type: integer
+      item_count:
+        example: 3
+        type: integer
+      total_amount:
+        example: 45000
+        type: integer
+    type: object
 info:
   contact:
     email: support@example.com
     name: API Support
   description: |-
-    RESTful API for managing categories and products with full CRUD operations
+    RESTful API for managing categories, products, transactions, and POS operations
 
     ## Features:
-    - Category Management (Get all, Get by ID, Create, Update, Delete)
-    - Product Management (Get all with category names, Get by ID with category, Create, Update, Delete)
+    - Category Management (CRUD)
+    - Product Management (CRUD with category relationship)
     - Product Search by Name (case-insensitive partial match)
-    - Product-Category Relationship (Foreign key with JOIN operations)
-    - Transaction / Checkout (Process multi-item checkout with stock deduction)
-    - Sales Reports (Daily summary and date range reports with best selling product)
-
-    ## Response Format:
-    All endpoints return a standard response with:
-    - status (bool): Request success status
-    - message (string): Response message
-    - data (object): Response data (when applicable)
+    - Transaction / Checkout (multi-item checkout with stock deduction)
+    - Sales Reports (daily summary, date range, best selling product)
+    - Dashboard Statistics
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT
-  title: Category Management API
+  title: Retail Core API
   version: "1.0"
 paths:
   /api/checkout:
@@ -222,7 +284,7 @@ paths:
           description: Checkout successful
           schema:
             allOf:
-            - $ref: '#/definitions/models.Response'
+            - $ref: '#/definitions/helpers.Response'
             - properties:
                 data:
                   $ref: '#/definitions/models.Transaction'
@@ -230,27 +292,42 @@ paths:
         "400":
           description: Invalid request body or validation error
           schema:
-            $ref: '#/definitions/models.Response'
+            $ref: '#/definitions/helpers.ErrorResponse'
         "500":
           description: Server error or insufficient stock
           schema:
-            $ref: '#/definitions/models.Response'
+            $ref: '#/definitions/helpers.ErrorResponse'
       summary: Process checkout
       tags:
       - Transactions
+  /api/dashboard:
+    get:
+      description: Retrieve summary statistics for the POS dashboard
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully retrieved dashboard data
+          schema:
+            allOf:
+            - $ref: '#/definitions/helpers.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.DashboardStats'
+              type: object
+      summary: Get dashboard statistics
+      tags:
+      - Dashboard
   /api/report:
     get:
-      description: Get sales summary for a specific date range including total revenue,
-        transaction count, and best selling product
+      description: Retrieve the sales summary for a specific date range
       parameters:
-      - description: Start date (YYYY-MM-DD format)
-        example: '"2026-01-01"'
+      - description: Start date (YYYY-MM-DD)
         in: query
         name: start_date
         required: true
         type: string
-      - description: End date (YYYY-MM-DD format)
-        example: '"2026-02-01"'
+      - description: End date (YYYY-MM-DD)
         in: query
         name: end_date
         required: true
@@ -259,48 +336,99 @@ paths:
       - application/json
       responses:
         "200":
-          description: Sales report retrieved successfully
+          description: Successfully retrieved report
           schema:
             allOf:
-            - $ref: '#/definitions/models.Response'
+            - $ref: '#/definitions/helpers.Response'
             - properties:
                 data:
                   $ref: '#/definitions/models.SalesReport'
               type: object
         "400":
-          description: Missing required query parameters
+          description: Missing start_date or end_date
           schema:
-            $ref: '#/definitions/models.Response'
-        "500":
-          description: Failed to get report
-          schema:
-            $ref: '#/definitions/models.Response'
+            $ref: '#/definitions/helpers.ErrorResponse'
       summary: Get sales report by date range
       tags:
       - Reports
   /api/report/today:
     get:
-      description: Get sales summary for today including total revenue, transaction
-        count, and best selling product
+      description: Retrieve the sales summary for today including revenue, transaction
+        count, and best seller
       produces:
       - application/json
       responses:
         "200":
-          description: Daily sales report retrieved successfully
+          description: Successfully retrieved today's report
           schema:
             allOf:
-            - $ref: '#/definitions/models.Response'
+            - $ref: '#/definitions/helpers.Response'
             - properties:
                 data:
                   $ref: '#/definitions/models.SalesReport'
               type: object
-        "500":
-          description: Failed to get daily report
-          schema:
-            $ref: '#/definitions/models.Response'
       summary: Get today's sales report
       tags:
       - Reports
+  /api/transactions:
+    get:
+      description: Retrieve a paginated list of all transactions
+      parameters:
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Items per page (default: 20, max: 100)'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Successfully retrieved transactions
+          schema:
+            allOf:
+            - $ref: '#/definitions/helpers.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.PaginatedTransactions'
+              type: object
+      summary: Get all transactions
+      tags:
+      - Transactions
+  /api/transactions/{id}:
+    get:
+      description: Retrieve details of a specific transaction including its items
+      parameters:
+      - description: Transaction ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Transaction retrieved successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/helpers.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.Transaction'
+              type: object
+        "400":
+          description: Invalid transaction ID
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+        "404":
+          description: Transaction not found
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+      summary: Get a transaction by ID
+      tags:
+      - Transactions
   /categories:
     get:
       description: Retrieve a list of all categories
@@ -311,7 +439,7 @@ paths:
           description: Successfully retrieved all categories
           schema:
             allOf:
-            - $ref: '#/definitions/models.Response'
+            - $ref: '#/definitions/helpers.Response'
             - properties:
                 data:
                   items:
@@ -339,7 +467,7 @@ paths:
           description: Category created successfully
           schema:
             allOf:
-            - $ref: '#/definitions/models.Response'
+            - $ref: '#/definitions/helpers.Response'
             - properties:
                 data:
                   $ref: '#/definitions/models.Category'
@@ -347,7 +475,7 @@ paths:
         "400":
           description: Invalid request body or validation error
           schema:
-            $ref: '#/definitions/models.Response'
+            $ref: '#/definitions/helpers.ErrorResponse'
       summary: Create a new category
       tags:
       - Categories
@@ -366,15 +494,15 @@ paths:
         "200":
           description: Category deleted successfully
           schema:
-            $ref: '#/definitions/models.Response'
+            $ref: '#/definitions/helpers.Response'
         "400":
           description: Invalid category ID
           schema:
-            $ref: '#/definitions/models.Response'
+            $ref: '#/definitions/helpers.ErrorResponse'
         "404":
           description: Category not found
           schema:
-            $ref: '#/definitions/models.Response'
+            $ref: '#/definitions/helpers.ErrorResponse'
       summary: Delete a category
       tags:
       - Categories
@@ -393,7 +521,7 @@ paths:
           description: Category retrieved successfully
           schema:
             allOf:
-            - $ref: '#/definitions/models.Response'
+            - $ref: '#/definitions/helpers.Response'
             - properties:
                 data:
                   $ref: '#/definitions/models.Category'
@@ -401,11 +529,11 @@ paths:
         "400":
           description: Invalid category ID
           schema:
-            $ref: '#/definitions/models.Response'
+            $ref: '#/definitions/helpers.ErrorResponse'
         "404":
           description: Category not found
           schema:
-            $ref: '#/definitions/models.Response'
+            $ref: '#/definitions/helpers.ErrorResponse'
       summary: Get a category by ID
       tags:
       - Categories
@@ -432,7 +560,7 @@ paths:
           description: Category updated successfully
           schema:
             allOf:
-            - $ref: '#/definitions/models.Response'
+            - $ref: '#/definitions/helpers.Response'
             - properties:
                 data:
                   $ref: '#/definitions/models.Category'
@@ -440,29 +568,44 @@ paths:
         "400":
           description: Invalid request body or validation error
           schema:
-            $ref: '#/definitions/models.Response'
+            $ref: '#/definitions/helpers.ErrorResponse'
         "404":
           description: Category not found
           schema:
-            $ref: '#/definitions/models.Response'
+            $ref: '#/definitions/helpers.ErrorResponse'
       summary: Update a category
       tags:
       - Categories
-  /health:
+  /categories/{id}/products:
     get:
-      description: Check if the API server is running
+      description: Retrieve all products belonging to a specific category
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: integer
       produces:
       - application/json
       responses:
         "200":
-          description: Server is running
+          description: Products retrieved successfully
           schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Health check endpoint
+            allOf:
+            - $ref: '#/definitions/helpers.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/models.Product'
+                  type: array
+              type: object
+        "400":
+          description: Invalid category ID
+          schema:
+            $ref: '#/definitions/helpers.ErrorResponse'
+      summary: Get products by category
       tags:
-      - Health
+      - Categories
   /products:
     get:
       description: Retrieve a list of all products with their category names. Supports
@@ -479,7 +622,7 @@ paths:
           description: Successfully retrieved all products
           schema:
             allOf:
-            - $ref: '#/definitions/models.Response'
+            - $ref: '#/definitions/helpers.Response'
             - properties:
                 data:
                   items:
@@ -507,7 +650,7 @@ paths:
           description: Product created successfully
           schema:
             allOf:
-            - $ref: '#/definitions/models.Response'
+            - $ref: '#/definitions/helpers.Response'
             - properties:
                 data:
                   $ref: '#/definitions/models.Product'
@@ -515,7 +658,7 @@ paths:
         "400":
           description: Invalid request body or validation error
           schema:
-            $ref: '#/definitions/models.Response'
+            $ref: '#/definitions/helpers.ErrorResponse'
       summary: Create a new product
       tags:
       - Products
@@ -534,15 +677,15 @@ paths:
         "200":
           description: Product deleted successfully
           schema:
-            $ref: '#/definitions/models.Response'
+            $ref: '#/definitions/helpers.Response'
         "400":
           description: Invalid product ID
           schema:
-            $ref: '#/definitions/models.Response'
+            $ref: '#/definitions/helpers.ErrorResponse'
         "404":
           description: Product not found
           schema:
-            $ref: '#/definitions/models.Response'
+            $ref: '#/definitions/helpers.ErrorResponse'
       summary: Delete a product
       tags:
       - Products
@@ -562,7 +705,7 @@ paths:
           description: Product retrieved successfully
           schema:
             allOf:
-            - $ref: '#/definitions/models.Response'
+            - $ref: '#/definitions/helpers.Response'
             - properties:
                 data:
                   $ref: '#/definitions/models.Product'
@@ -570,11 +713,11 @@ paths:
         "400":
           description: Invalid product ID
           schema:
-            $ref: '#/definitions/models.Response'
+            $ref: '#/definitions/helpers.ErrorResponse'
         "404":
           description: Product not found
           schema:
-            $ref: '#/definitions/models.Response'
+            $ref: '#/definitions/helpers.ErrorResponse'
       summary: Get a product by ID
       tags:
       - Products
@@ -601,7 +744,7 @@ paths:
           description: Product updated successfully
           schema:
             allOf:
-            - $ref: '#/definitions/models.Response'
+            - $ref: '#/definitions/helpers.Response'
             - properties:
                 data:
                   $ref: '#/definitions/models.Product'
@@ -609,11 +752,11 @@ paths:
         "400":
           description: Invalid request body or validation error
           schema:
-            $ref: '#/definitions/models.Response'
+            $ref: '#/definitions/helpers.ErrorResponse'
         "404":
           description: Product not found
           schema:
-            $ref: '#/definitions/models.Response'
+            $ref: '#/definitions/helpers.ErrorResponse'
       summary: Update a product
       tags:
       - Products

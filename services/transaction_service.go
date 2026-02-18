@@ -1,14 +1,17 @@
 package services
 
 import (
-	"category-management-api/models"
-	"category-management-api/repositories"
 	"errors"
+	"retail-core-api/models"
+	"retail-core-api/repositories"
 )
 
 // TransactionService defines the interface for transaction business logic
 type TransactionService interface {
 	Checkout(items []models.CheckoutItem) (*models.Transaction, error)
+	GetAllTransactions(page, limit int) (*models.PaginatedTransactions, error)
+	GetTransactionByID(id int) (*models.Transaction, error)
+	GetDashboardStats() (*models.DashboardStats, error)
 	GetDailySalesReport() (*models.SalesReport, error)
 	GetSalesReportByDateRange(startDate, endDate string) (*models.SalesReport, error)
 }
@@ -52,4 +55,22 @@ func (s *transactionService) GetSalesReportByDateRange(startDate, endDate string
 		return nil, errors.New("start_date and end_date are required")
 	}
 	return s.repo.GetSalesReportByDateRange(startDate, endDate)
+}
+
+// GetAllTransactions returns a paginated list of transactions
+func (s *transactionService) GetAllTransactions(page, limit int) (*models.PaginatedTransactions, error) {
+	return s.repo.GetAllTransactions(page, limit)
+}
+
+// GetTransactionByID returns a single transaction with its details
+func (s *transactionService) GetTransactionByID(id int) (*models.Transaction, error) {
+	if id <= 0 {
+		return nil, errors.New("invalid transaction ID")
+	}
+	return s.repo.GetTransactionByID(id)
+}
+
+// GetDashboardStats returns summary statistics for the admin dashboard
+func (s *transactionService) GetDashboardStats() (*models.DashboardStats, error) {
+	return s.repo.GetDashboardStats()
 }

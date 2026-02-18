@@ -1,9 +1,9 @@
 package services
 
 import (
-	"category-management-api/models"
-	"category-management-api/repositories"
 	"errors"
+	"retail-core-api/models"
+	"retail-core-api/repositories"
 )
 
 // CategoryService defines the interface for category business logic

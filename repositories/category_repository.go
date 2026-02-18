@@ -1,8 +1,8 @@
 package repositories
 
 import (
-	"category-management-api/models"
 	"database/sql"
+	"retail-core-api/models"
 	"time"
 )
 

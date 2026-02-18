@@ -1,15 +1,16 @@
 package services
 
 import (
-	"category-management-api/models"
-	"category-management-api/repositories"
 	"errors"
+	"retail-core-api/models"
+	"retail-core-api/repositories"
 )
 
 // ProductService defines the interface for product business logic
 type ProductService interface {
 	GetAllProducts(name string) ([]models.Product, error)
 	GetProductByID(id int) (*models.Product, error)
+	GetProductsByCategoryID(categoryID int) ([]models.Product, error)
 	CreateProduct(product models.Product) (*models.Product, error)
 	UpdateProduct(id int, product models.Product) (*models.Product, error)
 	DeleteProduct(id int) error
@@ -109,4 +110,12 @@ func (s *productService) UpdateProduct(id int, product models.Product) (*models.
 // DeleteProduct removes a product by its ID
 func (s *productService) DeleteProduct(id int) error {
 	return s.repo.Delete(id)
+}
+
+// GetProductsByCategoryID returns all products belonging to a category
+func (s *productService) GetProductsByCategoryID(categoryID int) ([]models.Product, error) {
+	if categoryID <= 0 {
+		return nil, errors.New("invalid category ID")
+	}
+	return s.repo.GetByCategoryID(categoryID)
 }

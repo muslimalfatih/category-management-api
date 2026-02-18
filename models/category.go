@@ -18,11 +18,3 @@ type CategoryInput struct {
 	Name        string `json:"name" example:"Electronics" binding:"required"`
 	Description string `json:"description" example:"Electronic devices and gadgets"`
 }
-
-// Response represents a standard API response
-// @Description Standard API response structure
-type Response struct {
-	Status  bool        `json:"status" example:"true"`
-	Message string      `json:"message" example:"Success"`
-	Data    interface{} `json:"data,omitempty" swaggertype:"object"`
-}
