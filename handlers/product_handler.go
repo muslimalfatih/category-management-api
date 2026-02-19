@@ -20,22 +20,62 @@ func NewProductHandler(service services.ProductService) *ProductHandler {
 }
 
 // List godoc
-// @Summary Get all products
-// @Description Retrieve a list of all products with their category names. Supports optional search by name.
+// @Summary Get all products (paginated)
+// @Description Retrieve a paginated list of products. Supports search by name and filter by category_id.
 // @Tags Products
 // @Produce json
-// @Param name query string false "Search product by name (case-insensitive partial match)"
-// @Success 200 {object} helpers.Response{data=[]models.Product} "Successfully retrieved all products"
+// @Param search query string false "Search product by name (case-insensitive partial match)"
+// @Param category_id query int false "Filter by category ID"
+// @Param page query int false "Page number (default: 1)"
+// @Param limit query int false "Items per page (default: 20)"
+// @Success 200 {object} helpers.PaginatedResponse
 // @Router /products [get]
 func (h *ProductHandler) List(c *gin.Context) {
-	name := c.Query("name")
+	params := models.ProductListParams{
+		Search: c.Query("search"),
+	}
 
-	products, err := h.service.GetAllProducts(name)
+	// Also support legacy "name" query param
+	if params.Search == "" {
+		params.Search = c.Query("name")
+	}
+
+	if catID := c.Query("category_id"); catID != "" {
+		if id, err := strconv.Atoi(catID); err == nil {
+			params.CategoryID = &id
+		}
+	}
+
+	if page := c.Query("page"); page != "" {
+		if p, err := strconv.Atoi(page); err == nil {
+			params.Page = p
+		}
+	}
+	if params.Page <= 0 {
+		params.Page = 1
+	}
+
+	if limit := c.Query("limit"); limit != "" {
+		if l, err := strconv.Atoi(limit); err == nil {
+			params.Limit = l
+		}
+	}
+	if params.Limit <= 0 {
+		params.Limit = 20
+	}
+
+	result, err := h.service.GetAllProducts(params)
 	if err != nil {
 		helpers.InternalError(c, "Failed to retrieve products", err.Error())
 		return
 	}
-	helpers.OK(c, "Successfully retrieved all products", products)
+
+	helpers.Paginated(c, "Successfully retrieved products", result.Data, helpers.PaginationMeta{
+		Page:       result.Page,
+		Limit:      result.Limit,
+		Total:      result.Total,
+		TotalPages: result.TotalPages,
+	})
 }
 
 // GetByID godoc
@@ -84,10 +124,19 @@ func (h *ProductHandler) Create(c *gin.Context) {
 		return
 	}
 
+	isActive := true
+	if input.IsActive != nil {
+		isActive = *input.IsActive
+	}
+
 	product := models.Product{
 		Name:       input.Name,
 		Price:      input.Price,
 		Stock:      input.Stock,
+		SKU:        input.SKU,
+		ImageURL:   input.ImageURL,
+		Unit:       input.Unit,
+		IsActive:   isActive,
 		CategoryID: input.CategoryID,
 	}
 
@@ -128,7 +177,16 @@ func (h *ProductHandler) Update(c *gin.Context) {
 		Name:       input.Name,
 		Price:      input.Price,
 		Stock:      input.Stock,
+		SKU:        input.SKU,
+		ImageURL:   input.ImageURL,
+		Unit:       input.Unit,
 		CategoryID: input.CategoryID,
+	}
+
+	if input.IsActive != nil {
+		product.IsActive = *input.IsActive
+	} else {
+		product.IsActive = true
 	}
 
 	updated, err := h.service.UpdateProduct(id, product)

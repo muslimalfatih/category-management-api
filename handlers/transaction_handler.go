@@ -22,11 +22,11 @@ func NewTransactionHandler(service services.TransactionService) *TransactionHand
 
 // Checkout godoc
 // @Summary Process checkout
-// @Description Process a checkout with multiple items. Validates product availability, deducts stock, and creates a transaction.
+// @Description Process a checkout with items, payment method, optional discount and notes
 // @Tags Transactions
 // @Accept json
 // @Produce json
-// @Param request body models.CheckoutRequest true "Checkout request with items and quantities"
+// @Param request body models.CheckoutRequest true "Checkout request"
 // @Success 201 {object} helpers.Response{data=models.Transaction} "Checkout successful"
 // @Failure 400 {object} helpers.ErrorResponse "Invalid request body or validation error"
 // @Failure 500 {object} helpers.ErrorResponse "Server error or insufficient stock"
@@ -38,9 +38,14 @@ func (h *TransactionHandler) Checkout(c *gin.Context) {
 		return
 	}
 
-	transaction, err := h.service.Checkout(req.Items)
+	transaction, err := h.service.Checkout(req)
 	if err != nil {
-		helpers.InternalError(c, err.Error())
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "not found") || strings.Contains(errMsg, "insufficient stock") || strings.Contains(errMsg, "cannot be empty") || strings.Contains(errMsg, "invalid") {
+			helpers.BadRequest(c, errMsg)
+			return
+		}
+		helpers.InternalError(c, errMsg)
 		return
 	}
 	helpers.Created(c, "Checkout successful", transaction)
@@ -48,22 +53,31 @@ func (h *TransactionHandler) Checkout(c *gin.Context) {
 
 // ListTransactions godoc
 // @Summary Get all transactions
-// @Description Retrieve a paginated list of all transactions
+// @Description Retrieve a paginated list of all transactions with optional date range filter
 // @Tags Transactions
 // @Produce json
 // @Param page query int false "Page number (default: 1)"
 // @Param limit query int false "Items per page (default: 20, max: 100)"
+// @Param start_date query string false "Start date filter (YYYY-MM-DD)"
+// @Param end_date query string false "End date filter (YYYY-MM-DD)"
 // @Success 200 {object} helpers.Response{data=models.PaginatedTransactions} "Successfully retrieved transactions"
 // @Router /api/transactions [get]
 func (h *TransactionHandler) ListTransactions(c *gin.Context) {
 	page, limit := helpers.ParsePagination(c)
+	startDate := strings.TrimSpace(c.Query("start_date"))
+	endDate := strings.TrimSpace(c.Query("end_date"))
 
-	result, err := h.service.GetAllTransactions(page, limit)
+	result, err := h.service.GetAllTransactions(page, limit, startDate, endDate)
 	if err != nil {
 		helpers.InternalError(c, "Failed to retrieve transactions", err.Error())
 		return
 	}
-	helpers.OK(c, "Successfully retrieved transactions", result)
+	helpers.Paginated(c, "Successfully retrieved transactions", result.Data, helpers.PaginationMeta{
+		Page:       result.Page,
+		Limit:      result.Limit,
+		Total:      result.Total,
+		TotalPages: result.TotalPages,
+	})
 }
 
 // GetTransactionByID godoc
@@ -85,14 +99,44 @@ func (h *TransactionHandler) GetTransactionByID(c *gin.Context) {
 
 	transaction, err := h.service.GetTransactionByID(id)
 	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			helpers.NotFound(c, err.Error())
+			return
+		}
 		helpers.InternalError(c, "Failed to retrieve transaction", err.Error())
 		return
 	}
-	if transaction == nil {
-		helpers.NotFound(c, "Transaction not found")
+	helpers.OK(c, "Transaction retrieved successfully", transaction)
+}
+
+// VoidTransaction godoc
+// @Summary Void a transaction
+// @Description Void a transaction and restore product stock
+// @Tags Transactions
+// @Produce json
+// @Param id path int true "Transaction ID"
+// @Success 200 {object} helpers.Response "Transaction voided successfully"
+// @Failure 400 {object} helpers.ErrorResponse "Invalid transaction ID or already voided"
+// @Failure 500 {object} helpers.ErrorResponse "Server error"
+// @Router /api/transactions/{id}/void [patch]
+func (h *TransactionHandler) VoidTransaction(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil || id <= 0 {
+		helpers.BadRequest(c, "Invalid transaction ID")
 		return
 	}
-	helpers.OK(c, "Transaction retrieved successfully", transaction)
+
+	err = h.service.VoidTransaction(id)
+	if err != nil {
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "not found") || strings.Contains(errMsg, "already voided") {
+			helpers.BadRequest(c, errMsg)
+			return
+		}
+		helpers.InternalError(c, errMsg)
+		return
+	}
+	helpers.OK(c, "Transaction voided successfully", nil)
 }
 
 // DailyReport godoc
@@ -136,6 +180,33 @@ func (h *TransactionHandler) ReportByRange(c *gin.Context) {
 		return
 	}
 	helpers.OK(c, "Successfully retrieved report", report)
+}
+
+// ReportSummary godoc
+// @Summary Get aggregated report summary
+// @Description Retrieve aggregated report summary with category breakdown for a date range
+// @Tags Reports
+// @Produce json
+// @Param start_date query string true "Start date (YYYY-MM-DD)"
+// @Param end_date query string true "End date (YYYY-MM-DD)"
+// @Success 200 {object} helpers.Response{data=models.ReportSummary} "Successfully retrieved report summary"
+// @Failure 400 {object} helpers.ErrorResponse "Missing start_date or end_date"
+// @Router /api/report/summary [get]
+func (h *TransactionHandler) ReportSummary(c *gin.Context) {
+	startDate := strings.TrimSpace(c.Query("start_date"))
+	endDate := strings.TrimSpace(c.Query("end_date"))
+
+	if startDate == "" || endDate == "" {
+		helpers.BadRequest(c, "start_date and end_date are required")
+		return
+	}
+
+	summary, err := h.service.GetReportSummary(startDate, endDate)
+	if err != nil {
+		helpers.InternalError(c, "Failed to retrieve report summary", err.Error())
+		return
+	}
+	helpers.OK(c, "Successfully retrieved report summary", summary)
 }
 
 // Dashboard godoc

@@ -1,40 +1,87 @@
 package middleware
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 )
 
-// Auth is a placeholder JWT authentication middleware.
-// In Phase 3 this will be expanded with proper JWT validation.
-func Auth() gin.HandlerFunc {
+// Auth validates the JWT token from the Authorization header or cookie
+// and sets user_id, user_email, user_role, user_name in the Gin context.
+func Auth(jwtSecret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		var tokenString string
+
+		// Try Authorization header first
 		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
+		if authHeader != "" {
+			parts := strings.SplitN(authHeader, " ", 2)
+			if len(parts) != 2 || parts[0] != "Bearer" {
+				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+					"status":  false,
+					"message": "Invalid authorization format, expected: Bearer <token>",
+				})
+				return
+			}
+			tokenString = parts[1]
+		}
+
+		// Fall back to cookie (for SSR requests)
+		if tokenString == "" {
+			if cookie, err := c.Cookie("token"); err == nil && cookie != "" {
+				tokenString = cookie
+			}
+		}
+
+		if tokenString == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 				"status":  false,
-				"message": "Authorization header required",
+				"message": "Authorization required",
 			})
 			return
 		}
 
-		parts := strings.SplitN(authHeader, " ", 2)
-		if len(parts) != 2 || parts[0] != "Bearer" {
+		// Parse and validate JWT
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			}
+			return []byte(jwtSecret), nil
+		})
+
+		if err != nil || !token.Valid {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 				"status":  false,
-				"message": "Invalid authorization format, expected: Bearer <token>",
+				"message": "Invalid or expired token",
 			})
 			return
 		}
 
-		token := parts[1]
-		_ = token // TODO Phase 3: validate JWT, extract claims
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+				"status":  false,
+				"message": "Invalid token claims",
+			})
+			return
+		}
 
-		// Placeholder: set user context
-		c.Set("user_id", 1)
-		c.Set("user_role", "admin")
+		// Extract claims and set in context
+		if userID, ok := claims["user_id"].(float64); ok {
+			c.Set("user_id", int(userID))
+		}
+		if email, ok := claims["email"].(string); ok {
+			c.Set("user_email", email)
+		}
+		if role, ok := claims["role"].(string); ok {
+			c.Set("user_role", role)
+		}
+		if name, ok := claims["name"].(string); ok {
+			c.Set("user_name", name)
+		}
 
 		c.Next()
 	}

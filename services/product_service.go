@@ -8,7 +8,7 @@ import (
 
 // ProductService defines the interface for product business logic
 type ProductService interface {
-	GetAllProducts(name string) ([]models.Product, error)
+	GetAllProducts(params models.ProductListParams) (*models.PaginatedProducts, error)
 	GetProductByID(id int) (*models.Product, error)
 	GetProductsByCategoryID(categoryID int) ([]models.Product, error)
 	CreateProduct(product models.Product) (*models.Product, error)
@@ -30,9 +30,9 @@ func NewProductService(repo repositories.ProductRepository, categoryRepo reposit
 	}
 }
 
-// GetAllProducts returns all products, optionally filtered by name
-func (s *productService) GetAllProducts(name string) ([]models.Product, error) {
-	return s.repo.GetAll(name)
+// GetAllProducts returns paginated products with optional search/filter
+func (s *productService) GetAllProducts(params models.ProductListParams) (*models.PaginatedProducts, error) {
+	return s.repo.GetAll(params)
 }
 
 // GetProductByID returns a product by its ID
